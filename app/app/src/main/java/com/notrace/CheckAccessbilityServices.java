@@ -1,6 +1,9 @@
 package com.notrace;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.text.TextUtils;
@@ -11,9 +14,11 @@ import android.widget.Toast;
 
 import com.notrace.utils.WebsocketConn;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +28,6 @@ import java.util.Vector;
  * Created by notrace on 2016/8/5.
  */
 public class CheckAccessbilityServices extends AccessibilityService {
-    //    private boolean shouldScrap = false;
-//    private boolean articalPage = false;
-//    private boolean articalList = false;
     private boolean webPage = false;
     private Map<String, Long> timeStamp = new HashMap<>();
     private final String LOGTAG = "=====";
@@ -38,15 +40,8 @@ public class CheckAccessbilityServices extends AccessibilityService {
         int type = event.getEventType();
         switch (type) {
             case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
-
-                //切换页面的时候此时会触发一个叫TYPE_WINDOW_STATE_CHANGED的事件
                 AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
                 if ("com.tencent.mm".equals(event.getPackageName()) && "com.tencent.mm.plugin.webview.ui.tools.WebViewUI".equals(event.getClassName())) {
-//                    List<AccessibilityNodeInfo> title = nodeInfo.findAccessibilityNodeInfosByViewId("android:id/text1");
-//                    if(title!=null&&title.size()>0) {
-//                        articalPage= true;
-//                    }
-//                    shouldScrap = true;
                     webPage = true;
                     if (windowId == nodeInfo.getWindowId()) {
                         final AccessibilityNodeInfo node = findWebViewNode(getRootInActiveWindow());
@@ -68,7 +63,6 @@ public class CheckAccessbilityServices extends AccessibilityService {
                         }
                     }
                 } else {
-//                    shouldScrap = false;
                     webPage = false;
                 }
                 if (nodeInfo != null) {
@@ -82,34 +76,6 @@ public class CheckAccessbilityServices extends AccessibilityService {
 
                 break;
             case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
-//                if(shouldScrap) {
-//                    AccessibilityNodeInfo nodeInfo1 = event.getSource();
-//                    if("com.tencent.mm".equals(event.getPackageName()) && "android.webkit.WebView".equals(event.getClassName())) {
-//
-//                    } else {
-//                        List<AccessibilityNodeInfo> moreInfos = nodeInfo1.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/he");
-//                        if(moreInfos!=null && moreInfos.size()>0) {
-//                            if(!timeStamp.containsKey("更多") || System.currentTimeMillis() - timeStamp.get("更多")>1000) {
-//                                moreInfos.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//                            }
-//                            timeStamp.put("更多",System.currentTimeMillis());
-//                        }else {
-//                            moreInfos = nodeInfo1.findAccessibilityNodeInfosByText("复制链接");
-//                            if(moreInfos!=null && moreInfos.size()>0) {
-//                                if(!timeStamp.containsKey("复制链接") || System.currentTimeMillis() - timeStamp.get("复制链接")>1000){
-//                                    moreInfos.get(0).getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//                                    new Handler().postDelayed(new Runnable() {
-//                                        @Override
-//                                        public void run() {
-//                                            performGlobalAction(GLOBAL_ACTION_BACK);
-//                                        }
-//                                    },800);
-//                                }
-//                                timeStamp.put("复制链接",System.currentTimeMillis());
-//                            }
-//                        }
-//                    }
-//                }
                 try {
                     if (webPage && "android.webkit.WebView".equals(event.getClassName())) {
                         if (isWeixinArticalList(event.getSource())) {
@@ -140,7 +106,8 @@ public class CheckAccessbilityServices extends AccessibilityService {
             accessibilityNodeInfo.getBoundsInScreen(pageRect);
             final AccessibilityNodeInfo node = getNextAritvalItem(accessibilityNodeInfo);
             if (node != null) {
-                Log.e(LOGTAG, indexVec.toString() + "\t" + getNodeinfo(node));
+                List<String> nodeinfo = getNodeinfo(node);
+                Log.e(LOGTAG, indexVec.toString() + "\t" + nodeinfo.toString());
                 Rect rect = new Rect();
                 node.getBoundsInScreen(rect);
                 if ((pageRect.bottom - rect.bottom) < (rect.bottom - rect.top) / 2) {
@@ -151,9 +118,13 @@ public class CheckAccessbilityServices extends AccessibilityService {
                 // 调用adb 进行模拟点击
                 JSONObject jsonObject = new JSONObject();
                 try {
-
                     jsonObject.put("type", "cmd");
                     jsonObject.put("content", String.format("adb shell input tap %d %d", (rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2));
+                    JSONArray jsonArray = new JSONArray();
+                    for(String s:nodeinfo) {
+                        jsonArray.put(s);
+                    }
+                    jsonObject.put("data",jsonArray);
                     WebsocketConn.sendMessage(jsonObject.toString());
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -186,14 +157,14 @@ public class CheckAccessbilityServices extends AccessibilityService {
         return ret;
     }
 
-    private String getNodeinfo(AccessibilityNodeInfo nodeInfo) {
-        StringBuilder stringBuilder = new StringBuilder();
+    private List<String> getNodeinfo(AccessibilityNodeInfo nodeInfo) {
+        List<String> strings = new ArrayList<>();
         for (int i = 0; i < nodeInfo.getChildCount(); i++) {
             if (!TextUtils.isEmpty(nodeInfo.getChild(i).getContentDescription())) {
-                stringBuilder.append(nodeInfo.getChild(i).getContentDescription());
+                strings.add(nodeInfo.getChild(i).getContentDescription().toString());
             }
         }
-        return stringBuilder.toString();
+        return strings;
     }
 
     private AccessibilityNodeInfo getNextAritvalItem(AccessibilityNodeInfo root) {
@@ -253,7 +224,7 @@ public class CheckAccessbilityServices extends AccessibilityService {
     private void clickOnMenuMore() {
         List<AccessibilityNodeInfo> moreInfos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/he");
         if (moreInfos != null && moreInfos.size() > 0) {
-            if (!timeStamp.containsKey("更多") || System.currentTimeMillis() - timeStamp.get("更多") > 1000) {
+            if (!timeStamp.containsKey("更多") || System.currentTimeMillis() - timeStamp.get("更多") > 800) {
                 moreInfos.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
             }
             timeStamp.put("更多", System.currentTimeMillis());
@@ -288,11 +259,29 @@ public class CheckAccessbilityServices extends AccessibilityService {
         AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
         List<AccessibilityNodeInfo> moreInfos = nodeInfo.findAccessibilityNodeInfosByText("复制链接");
         if (moreInfos != null && moreInfos.size() > 0) {
-            if (!timeStamp.containsKey("复制链接") || System.currentTimeMillis() - timeStamp.get("复制链接") > 1000) {
+            if (!timeStamp.containsKey("复制链接") || System.currentTimeMillis() - timeStamp.get("复制链接") > 800) {
                 moreInfos.get(0).getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
+                        // 获取系统剪贴板
+                        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        // 获取剪贴板的剪贴数据集
+                        ClipData clipData = clipboard.getPrimaryClip();
+                        if (clipData != null && clipData.getItemCount() > 0) {
+                            // 从数据集中获取（粘贴）第一条文本数据
+                            CharSequence text = clipData.getItemAt(0).getText();
+                            if(!TextUtils.isEmpty(text)) {
+                                JSONObject jsonObject = new JSONObject();
+                                try {
+                                    jsonObject.put("type", "insert");
+                                    jsonObject.put("data", text);
+                                    WebsocketConn.sendMessage(jsonObject.toString());
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
                         performGlobalAction(GLOBAL_ACTION_BACK);
                     }
                 }, 800);

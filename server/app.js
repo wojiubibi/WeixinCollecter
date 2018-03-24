@@ -39,6 +39,8 @@ app.ws('/ws', function(ws, req) {
       if(data.type === 'cmd' && data.content) {
         var content = data.content;
         require("./tools/process").exec(content);
+      }else if(data.type === 'insert' && data.data) {
+        
       }
     }catch(e) {
       console.log(e);
