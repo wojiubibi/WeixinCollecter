@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.example.myapp" version="1.0.0">
+    <name>Hello</name>
+    <preference name="loglevel" value="DEBUG" />
+    <preference name="launch_locally" value="false" />
+    <!--<preference name="launch_url" value="http://p193fqn61.bkt.clouddn.com/dist/pages/home.js"/>-->
+    <preference name="launch_url_test" value="http://10.50.30.43:8081/dist/pages/home.js"/>
+    <!--<preference name="launch_url_test" value="http://58.58.186.227:8090/dist/pages/home.js"/>-->
+    <!--<preference name="launch_url_product" value="http://58.58.186.227:88/dist/pages/home.js"/>-->
+    <preference name="test" value="true" />
+    <preference name="websocketurl" value="ws://192.168.1.4:3000/ws" />
+
+</widget>
