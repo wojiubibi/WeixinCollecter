@@ -4,6 +4,8 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 
+import com.notrace.config.AppConfig;
+
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -31,7 +33,7 @@ public class WebsocketConn {
         if(handler!=null) {
             handler.getLooper().quit();
         }
-        HandlerThread handlerThread = new HandlerThread("websocket");
+        final HandlerThread handlerThread = new HandlerThread("websocket");
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
 
@@ -57,8 +59,9 @@ public class WebsocketConn {
                         System.out.println("client request header:" + response.request().headers());
                         System.out.println("client response header:" + response.headers());
                         System.out.println("client response:" + response);
+
                         try {
-                            webSocket.sendMessage(RequestBody.create(WebSocket.BINARY, "command 1".getBytes("UTF-8")));
+                            webSocket.sendPing(null);
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -77,7 +80,17 @@ public class WebsocketConn {
 
                     @Override
                     public void onPong(Buffer payload) {
-
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    _webSocket.sendPing(null);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    retryDelay();
+                                }
+                            }
+                        },60*1000);
                     }
 
                     @Override
@@ -86,6 +99,21 @@ public class WebsocketConn {
                 });
             }
         });
+    }
+
+    private static void retryDelay() {
+        try {
+            _webSocket.close(0,"ping failed");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                conn(AppConfig.getWebsocketUrl());
+            }
+        },10*1000);
     }
 
     public static void sendMessage(final String message) {

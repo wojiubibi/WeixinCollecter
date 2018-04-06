@@ -12,7 +12,7 @@
 
 # roadmap
 
-指定查看公众号的内容 todo
+指定查看公众号的内容 todo done
 指定查看公众号的范围，日期，最早一篇文章 todo
 服务端数据的保存 todo
 Android端推送自动更新 todo

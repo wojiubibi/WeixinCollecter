@@ -1,4 +1,6 @@
 var express = require('express');
+var {newArtical,updateArtical,getAuthorInfo} = require("./db/DbAdapter")
+
 var path = require('path');
 var favicon = require('serve-favicon');
 var logger = require('morgan');
@@ -27,27 +29,50 @@ app.use(express.static(path.join(__dirname, 'public')));
 // app.use('/', index);
 // app.use('/users', users);
 
+let author = "lengtoo";
+let currentArtical = null;
+
 app.get('/ws',function(req,res,next){
   res.end();
 })
 app.ws('/ws', function(ws, req) {  
-  console.log('dsda');
+  ws.on('ping',function(msg){
+    console.log('ping received');
+    ws.pong();
+  });
+  ws.on('pong',function(msg){
+    
+  });
   ws.on('message', function(msg) {  
     console.log(msg);  
     try{
       var data = JSON.parse(msg);
       if(data.type === 'cmd' && data.content) {
         var content = data.content;
+        currentArtical = {
+          name:data.data[0],
+          time:data.data[1]
+        }
+        newArtical(author,data.data[0],data.data[1]);
         require("./tools/process").exec(content);
       }else if(data.type === 'insert' && data.data) {
-        
+        if(currentArtical) {
+          updateArtical(author,currentArtical.name,currentArtical.time,data.data);
+        }
       }
     }catch(e) {
-      console.log(e);
+      // console.log(e);
     }
     ws.send('echo:');  
   });  
 })  
+
+// getAuthorInfo(author).then(authorInfo => {
+//   const articals = authorInfo.articals;
+//   console.log(articals);
+// }).catch(err => {
+//   console.log(err);
+// })
 
 // // catch 404 and forward to error handler
 // app.use(function(req, res, next) {
